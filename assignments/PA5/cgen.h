@@ -31,6 +31,8 @@ private:
    void code_bools(int);
    void code_select_gc();
    void code_constants();
+   std::vector<CgenNode> CgenNodeListTransformToVector();
+   void code_each_class_method(ostream &os);
 
 // The following creates an inheritance graph from
 // a list of classes.  The graph is implemented as
@@ -42,9 +44,10 @@ private:
    void install_classes(Classes cs);
    void build_inheritance_tree();
    void set_relations(CgenNodeP nd);
+   
 public:
    CgenClassTable(Classes, ostream& str);
-   void code();
+   void code(ostream &s);
    CgenNodeP root();
 };
 
@@ -54,8 +57,7 @@ private:
    CgenNodeP parentnd;                        // Parent of class
    List<CgenNode> *children;                  // Children of class
    Basicness basic_status;                    // `Basic' if class is basic
-                                              // `NotBasic' otherwise
-
+                                             // `NotBasic' otherwise
 public:
    CgenNode(Class_ c,
             Basicness bstatus,
@@ -66,6 +68,7 @@ public:
    void set_parentnd(CgenNodeP p);
    CgenNodeP get_parentnd() { return parentnd; }
    int basic() { return (basic_status == Basic); }
+   std::vector<method_class*> getMethodsFromClass(); 
 };
 
 class BoolConst 

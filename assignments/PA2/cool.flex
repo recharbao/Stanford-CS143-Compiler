@@ -48,8 +48,41 @@ extern YYSTYPE cool_yylval;
 /*
  * Define names for regular expressions here.
  */
+class           [Cc][Ll][Aa][Ss]
+else            [Ee][Ll][Ss][Ee]
+fi              [Ff][Ii]
+if              [Ii][Ff]
+in              [Ii][Nn]
+inherits        [Ii][Nn][Hh][Ee][Rr][Ii][Tt][Ss]
+let             [Ll][Ee][Tt]
+loop            [Ll][Oo][Oo][Pp]
+pool            [Pp][Oo][Oo][Ll]
+then            [Tt][Hh][Ee][Nn]
+while           [Ww][Hh][Ii][Ll][Ee]
+case            [Cc][Aa][Ss][Ee]
+esac            [Ee][Ss][Aa][Cc]
+of              [Oo][Ff]
+darrow         =>
+new             [Nn][Ee][Ww]
+isvoid          [Ii][Ss][Vv][Oo][Ii][Dd]
 
-DARROW          =>
+str_const 
+int_const
+bool_const 
+
+typeid
+objectid
+assign          <-
+not             [Nn][Oo][Tt]
+le              <=
+error
+
+
+
+digits         [0-9]+
+words          [a-zA-Z]+
+
+
 
 %%
 
@@ -61,7 +94,24 @@ DARROW          =>
  /*
   *  The multiple-character operators.
   */
-{DARROW}		{ return (DARROW); }
+{class}      { return CLASS; }
+{else}       { return ELSE; }
+{fi}         { return FI; }
+{if}         { return IF; }
+{in}         { return IN; }
+{inherits}   { return INHERITS; }
+{let}        { return LET; }
+{loop}       { return LOOP; }
+{pool}       { return POOL; }
+{then}       { return THEN; }
+{while}      { return WHILE; }
+{case}       { return CASE; }
+{esac}       { return ESAC; }
+{of}         { return OF; }
+{darrow}		 { return DARROW; }
+{new}        { return NEW; }
+{isvoid}     { return ISVOID; }
+
 
  /*
   * Keywords are case-insensitive except for the values true and false,
@@ -78,3 +128,8 @@ DARROW          =>
 
 
 %%
+
+int main(void) {
+  yylex();
+  return 0;
+}

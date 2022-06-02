@@ -17,6 +17,9 @@
 // define simple phylum - Program
 typedef class Program_class *Program;
 
+
+enum feature_type {method, attibute};
+
 class Program_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Program(); }
@@ -178,6 +181,7 @@ protected:
    Formals formals;
    Symbol return_type;
    Expression expr;
+   feature_type ft = feature_type::method;
 public:
    method_class(Symbol a1, Formals a2, Symbol a3, Expression a4) {
       name = a1;
@@ -203,6 +207,7 @@ protected:
    Symbol name;
    Symbol type_decl;
    Expression init;
+   feature_type ft = feature_type::attibute;
 public:
    attr_class(Symbol a1, Symbol a2, Expression a3) {
       name = a1;

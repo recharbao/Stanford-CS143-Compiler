@@ -24,6 +24,7 @@
 
 #include "cgen.h"
 #include "cgen_gc.h"
+#include <vector>
 
 extern void emit_string_constant(ostream& str, char *s);
 extern int cgen_debug;
@@ -136,6 +137,7 @@ void program_class::cgen(ostream &os)
 
   initialize_constants();
   CgenClassTable *codegen_classtable = new CgenClassTable(classes,os);
+  codegen_classtable->code();
 
   os << "\n# end of generated code\n";
 }
@@ -154,6 +156,8 @@ void program_class::cgen(ostream &os)
 //  for symbolic names you can use to refer to the strings.
 //
 //////////////////////////////////////////////////////////////////////////////
+
+// word_size = 32 bits, 4 bytes
 
 static void emit_load(char *dest_reg, int offset, char *source_reg, ostream& s)
 {
@@ -623,14 +627,10 @@ CgenClassTable::CgenClassTable(Classes classes, ostream& s) : nds(NULL) , str(s)
    intclasstag =    0 /* Change to your Int class tag here */;
    boolclasstag =   0 /* Change to your Bool class tag here */;
 
-   enterscope();
    if (cgen_debug) cout << "Building CgenClassTable" << endl;
    install_basic_classes();
    install_classes(classes);
    build_inheritance_tree();
-
-   code();
-   exitscope();
 }
 
 void CgenClassTable::install_basic_classes()
@@ -817,7 +817,7 @@ void CgenNode::set_parentnd(CgenNodeP p)
 
 
 
-void CgenClassTable::code()
+void CgenClassTable::code(ostream &s)
 {
   if (cgen_debug) cout << "coding global data" << endl;
   code_global_data();
@@ -842,6 +842,64 @@ void CgenClassTable::code()
 //                   - the class methods
 //                   - etc...
 
+  code_each_class_method();
+}
+
+
+
+std::vector<CgenNode> CgenClassTable::CgenNodeListTransformToVector() {
+  std::vector<CgenNode> result;
+  for (List<CgenNode> *c = nds; c != NULL; c = c->tl()) {
+    result.push_back(*c->hd());
+  }
+
+  return result;
+}
+
+
+std::vector<method_class*> CgenNode::getMethodsFromClass() {
+  std::vector<method_class*> methods_class;
+  Features features = get_features();
+  for (int i = features->first(); features->more(i); i = features->next(i)) {
+    Feature feature = features->nth(i);
+    if (feature->get_ft() == feature_type::method) {
+      methods_class.push_back((method_class*)feature);
+    }
+  }
+
+  return methods_class;
+}
+
+
+void CgenClassTable::code_each_class_method(ostream &os) {
+  std::vector<CgenNode> classes_CgenNode = CgenNodeListTransformToVector();
+  for (int i = 0; i < classes_CgenNode.size(); i++) {
+    std::vector<method_class*> methods_class = classes_CgenNode[i].getMethodsFromClass();
+    for (int i = 0; i < methods_class.size(); i++) {
+      methods_class[i]->code(os);
+    }
+  }
+}
+
+
+
+void method_class::code(ostream &os) {
+  emit_method_ref();
+  emit_addiu(SP, SP, -8, os);
+  emit_store(RA, 2, SP, os);
+  emit_store(FP, 1, SP, os);
+  // the fp point to last fp
+  emit_addiu(FP, SP, 4, os);
+
+  for (int i = formals->first(); formals->more(i); i = formals->next(i)) {
+    Formal formal = formals->nth(i);
+    Symbol formal_name = formal->get_name();
+  }
+
+  expr->code(os);
+  emit_load(RA, 2, SP, os);
+  emit_load(FP, 1, SP, os);
+  emit_addiu(SP, SP, 8, os);
 }
 
 
@@ -877,7 +935,14 @@ CgenNode::CgenNode(Class_ nd, Basicness bstatus, CgenClassTableP ct) :
 //
 //*****************************************************************
 
+
+
+// sp 3 * index  let
+// sp 3 * index + 1 param
+// sp 3 * index + 2 attribute
 void assign_class::code(ostream &s) {
+  expr->code(s);
+
 }
 
 void static_dispatch_class::code(ostream &s) {
@@ -887,45 +952,219 @@ void dispatch_class::code(ostream &s) {
 }
 
 void cond_class::code(ostream &s) {
+  pred->code(s);
+  emit_fetch_int(T1, ACC, s);
+
+  emit_beq(ZERO, T1, s);
+
+  then_exp->code(s);
+
+  emit_label_def();
+
+  else_exp->code(s);
+
+  emit_label_def();
+
 }
 
 void loop_class::code(ostream &s) {
+
+  emit_label_def();
+  pred->code(s);
+
+  emit_fetch_int(T1, ACC, s);
+  emit_beq(ZERO, T1, );
+
+  body->code(s);
+
+  emit_label_def();
+
 }
 
 void typcase_class::code(ostream &s) {
+
 }
 
 void block_class::code(ostream &s) {
+  for (int i = body->first(); body->more(i); i = body->next(i)) {
+    Expression e = body->nth(i);
+    e->code(s);
+  }
 }
 
 void let_class::code(ostream &s) {
+  init->code(s);
+  emit_push(ACC, s);
+  body->code(s);
+  emit_addiu(SP, SP, 4, s);
+
 }
 
 void plus_class::code(ostream &s) {
+    e1->code(s);
+    emit_push(ACC, s);
+
+    e2->code(s);
+    emit_jal("Object.copy", s);
+
+    emit_addiu(SP, SP, 4, s);
+    emit_load(T1, 0, SP, s);
+    emit_move(T2, ACC, s);
+    
+    emit_fetch_int(T1, T1, s);
+    emit_fetch_int(T2, T2, s);
+
+    emit_add(T3, T1, T2, s);
+    emit_store(T3, 3, ACC, s);
 }
 
 void sub_class::code(ostream &s) {
+   e1->code(s);
+    emit_push(ACC, s);
+
+    e2->code(s);
+    emit_jal("Object.copy", s);
+
+    emit_addiu(SP, SP, 4, s);
+    emit_load(T1, 0, SP, s);
+    emit_move(T2, ACC, s);
+
+    emit_fetch_int(T1, T1, s);
+    emit_fetch_int(T2, T2, s);
+
+    emit_sub(T3, T1, T2, s);
+    emit_store(T3, 3, ACC, s);
 }
 
 void mul_class::code(ostream &s) {
+   e1->code(s);
+    emit_push(ACC, s);
+
+    e2->code(s);
+    emit_jal("Object.copy", s);
+
+    emit_addiu(SP, SP, 4, s);
+    emit_load(T1, 0, SP, s);
+    emit_move(T2, ACC, s);
+    
+    emit_fetch_int(T1, T1, s);
+    emit_fetch_int(T2, T2, s);
+
+    emit_mul(T3, T1, T2, s);
+    emit_store(T3, 3, ACC, s);
 }
 
 void divide_class::code(ostream &s) {
+   e1->code(s);
+    emit_push(ACC, s);
+
+    e2->code(s);
+    emit_jal("Object.copy", s);
+
+    emit_addiu(SP, SP, 4, s);
+    emit_load(T1, 0, SP, s);
+    emit_move(T2, ACC, s);
+    
+    emit_fetch_int(T1, T1, s);
+    emit_fetch_int(T2, T2, s);
+
+    emit_div(T3, T1, T2, s);
+    emit_store(T3, 3, ACC, s);
 }
 
 void neg_class::code(ostream &s) {
+  e1->code(s);
+  emit_jal("Object.copy", s);
+  emit_fetch_int(T1, T1, s);
+  emit_neg(T1, T1, s);
+  emit_store_int(T1, ACC, s);
 }
 
 void lt_class::code(ostream &s) {
+  e1->code(s);
+  emit_push(ACC, s);
+
+  e2->code(s);
+  emit_jal("Object.copy", s);
+
+  emit_addiu(SP, SP, 4, s);
+  emit_load(T1, 0, SP, s);
+  emit_move(T2, ACC, s);
+    
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, T2, s);
+
+  emit_load_bool(ACC, BoolConst(1), s);
+
+  emit_blt(T1, T2, );
+
+
+  emit_load_bool(ACC, BoolConst(0), s);
+
+  emit_label_def();
 }
 
 void eq_class::code(ostream &s) {
+  e1->code(s);
+  emit_push(ACC, s);
+
+  e2->code(s);
+  emit_jal("Object.copy", s);
+
+  emit_addiu(SP, SP, 4, s);
+  emit_load(T1, 0, SP, s);
+  emit_move(T2, ACC, s);
+    
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, T2, s);
+
+  emit_load_bool(ACC, BoolConst(1), s);
+
+  emit_beq(T1, T2, );
+
+
+  emit_load_bool(ACC, BoolConst(0), s);
+
+  emit_label_def();
 }
 
 void leq_class::code(ostream &s) {
+  e1->code(s);
+  emit_push(ACC, s);
+
+  e2->code(s);
+  emit_jal("Object.copy", s);
+
+  emit_addiu(SP, SP, 4, s);
+  emit_load(T1, 0, SP, s);
+  emit_move(T2, ACC, s);
+    
+  emit_fetch_int(T1, T1, s);
+  emit_fetch_int(T2, T2, s);
+
+  emit_load_bool(ACC, BoolConst(1), s);
+
+  emit_bleq(T1, T2, );
+
+
+  emit_load_bool(ACC, BoolConst(0), s);
+
+  emit_label_def();
 }
 
 void comp_class::code(ostream &s) {
+  e1->code(s);
+  emit_fetch_int(T1, ACC, s);
+
+  emit_load_bool(ACC, BoolConst(1), s);
+
+  emit_bleq(T1, ZERO, );
+
+
+  emit_load_bool(ACC, BoolConst(0), s);
+
+  emit_label_def();
+
 }
 
 void int_const_class::code(ostream& s)  
@@ -953,6 +1192,7 @@ void isvoid_class::code(ostream &s) {
 }
 
 void no_expr_class::code(ostream &s) {
+  emit_move(ACC, ZERO, s);
 }
 
 void object_class::code(ostream &s) {

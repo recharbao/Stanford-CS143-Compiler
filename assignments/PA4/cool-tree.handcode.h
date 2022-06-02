@@ -56,30 +56,51 @@ void dump_with_types(ostream&, int);
 
 #define Class__EXTRAS                   \
 virtual Symbol get_filename() = 0;      \
+virtual Symbol get_name() = 0;			\
+virtual Symbol get_parent() = 0;		\
+virtual Features get_features() = 0;		\
 virtual void dump_with_types(ostream&,int) = 0; 
 
 
 #define class__EXTRAS                                 \
-Symbol get_filename() { return filename; }             \
+Symbol get_filename() { return filename; };             \
+Symbol get_name() { return name; };						\
+Symbol get_parent() { return parent; }					\
+Features get_features() { return features; }				\
 void dump_with_types(ostream&,int);                    
 
 
 #define Feature_EXTRAS                                        \
-virtual void dump_with_types(ostream&,int) = 0; 
+virtual Symbol get_name() = 0;				\
+virtual void dump_with_types(ostream&,int) = 0;		\
+virtual feature_type get_ft() = 0;
+
 
 
 #define Feature_SHARED_EXTRAS                                       \
-void dump_with_types(ostream&,int);    
+Symbol get_name() { return name; }		\
+feature_type get_ft() { return ft; } \
+void dump_with_types(ostream&,int);									
+			
+#define attr_EXTRAS		\
+Symbol get_type_decl() { return type_decl; }
 
 
-
+#define method_EXTRAS	\
+Formals get_formals() { return formals; } 	\
+void checkType(); 	\
+Symbol get_return_type() { return return_type; }		\
 
 
 #define Formal_EXTRAS                              \
+virtual Symbol get_name() = 0;		\
+virtual Symbol get_type_decl() = 0;	\
 virtual void dump_with_types(ostream&,int) = 0;
 
 
 #define formal_EXTRAS                           \
+Symbol get_name() { return name; }		\
+Symbol get_type_decl() { return type_decl; }	\
 void dump_with_types(ostream&,int);
 
 
@@ -96,10 +117,16 @@ Symbol type;                                 \
 Symbol get_type() { return type; }           \
 Expression set_type(Symbol s) { type = s; return this; } \
 virtual void dump_with_types(ostream&,int) = 0;  \
+virtual Symbol checkType(ClassTable*) = 0;			\
 void dump_type(ostream&, int);               \
 Expression_class() { type = (Symbol) NULL; }
 
 #define Expression_SHARED_EXTRAS           \
-void dump_with_types(ostream&,int); 
+void dump_with_types(ostream&,int); 		\
+Symbol checkType(ClassTable*);
+
+
+#define let_EXTRAS			\
+Symbol get_type_decl() { return type_decl; }
 
 #endif
